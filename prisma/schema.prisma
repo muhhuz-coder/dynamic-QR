@@ -1,0 +1,210 @@
+// Prisma schema for the QR Management System.
+// Mirrors docs/core-logic/05-database-schema.md; keep that doc in sync if this diverges.
+// `Admin` and `AuditLog` are not in the original spec's schema doc — they were an
+// undocumented dependency of updateQRTarget()/adminAuthMiddleware, defined here per
+// docs/GUARDRAILS.md process rule (schema changes reflected back into the docs).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProductType {
+  STAND
+  COIN
+  CARD
+
+  @@map("product_type")
+}
+
+enum ScanMethod {
+  NFC_TAP
+  QR_SCAN
+
+  @@map("scan_method")
+}
+
+enum DeviceType {
+  MOBILE
+  DESKTOP
+  TABLET
+
+  @@map("device_type")
+}
+
+/**
+ * What the physical QR image actually encodes. URL (the default) encodes this
+ * app's own short link and redirects through handleScan — the only type with
+ * scan analytics, since it's the only one that round-trips through our server.
+ * TEXT/VCARD/WIFI encode their payload directly in the QR, exactly like any
+ * standalone vCard/Wi-Fi QR generator — no redirect, no scan tracking possible.
+ */
+enum ContentType {
+  URL
+  TEXT
+  VCARD
+  WIFI
+
+  @@map("content_type")
+}
+
+model Admin {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash")
+  role         String   @default("admin") @db.VarChar(50)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // TOTP-based 2FA — see src/lib/auth/totp.ts. totpSecret is set once enrollment
+  // starts but totpEnabled only flips true after the admin confirms a valid code.
+  totpSecret  String? @map("totp_secret")
+  totpEnabled Boolean @default(false) @map("totp_enabled")
+
+  auditLogs AuditLog[]
+
+  @@map("admins")
+}
+
+model QrCode {
+  id     String @id @default(uuid()) @db.Uuid
+  qrName String @unique @map("qr_name") @db.VarChar(50)
+
+  shortCode  String  @unique @map("short_code") @db.VarChar(20)
+  qrImageUrl String? @map("qr_image_url")
+
+  targetUrl          String    @map("target_url")
+  targetUrlUpdatedAt DateTime? @map("target_url_updated_at")
+  expiresAt          DateTime? @map("expires_at")
+
+  // For non-URL types, targetUrl holds an auto-derived human-readable label
+  // (e.g. "vCard: Jane Doe") shown in the dashboard's Destination column —
+  // contentPayload holds the actual structured data encoded in the QR image.
+  // See src/lib/qr/contentTypes.ts.
+  contentType    ContentType @default(URL) @map("content_type")
+  contentPayload Json?       @map("content_payload")
+
+  // Visual customization: { fgColor?, bgColor?, logoUrl? } — see src/lib/qr/image.ts.
+  // Module shape (rounded/dot) isn't supported: the `qrcode` library only renders
+  // square modules, a real gap vs. some competitors' design studios.
+  designOptions Json? @map("design_options")
+
+  productType ProductType? @map("product_type")
+
+  // Friendly label distinct from qrName (which must stay unique/URL-safe) and
+  // free-text tags for filtering in the dashboard — see docs/core-logic/02-qr-management.md
+  // Implementation Notes (added after reviewing a competitor's actual dashboard).
+  displayName String?  @map("display_name") @db.VarChar(255)
+  tags        String[] @default([])
+
+  // Per-QR opt-out of the org-wide default UTM parameters (see OrgSettings) —
+  // matches a competitor's per-QR "Enable UTM tracking" toggle, on by default.
+  utmEnabled Boolean @default(true) @map("utm_enabled")
+
+  batchId   String? @map("batch_id") @db.VarChar(50)
+  batchName String? @map("batch_name") @db.VarChar(255)
+
+  totalScanCount     Int        @default(0) @map("total_scan_count")
+  lastScannedAt      DateTime?  @map("last_scanned_at")
+  lastScannedLocation String?   @map("last_scanned_location") @db.VarChar(100)
+  lastScannedByDevice DeviceType? @map("last_scanned_by_device")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  scanEvents QrScanEvent[]
+
+  @@index([batchId])
+  @@map("qr_codes")
+}
+
+model QrScanEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  qrId      String @map("qr_id") @db.Uuid
+  qrCode    QrCode @relation(fields: [qrId], references: [id])
+  shortCode String? @map("short_code") @db.VarChar(20)
+
+  scanTimestamp DateTime    @default(now()) @map("scan_timestamp")
+  scanMethod    ScanMethod? @map("scan_method")
+
+  deviceType DeviceType? @map("device_type")
+  deviceOs   String?     @map("device_os") @db.VarChar(50)
+  browser    String?     @db.VarChar(100)
+  userAgent  String?     @map("user_agent")
+
+  ipAddress        String?  @map("ip_address") @db.VarChar(45)
+  locationCity     String?  @map("location_city") @db.VarChar(100)
+  locationCountry  String?  @map("location_country") @db.VarChar(100)
+  locationLatitude  Decimal? @map("location_latitude") @db.Decimal(10, 8)
+  locationLongitude Decimal? @map("location_longitude") @db.Decimal(11, 8)
+
+  targetUrlAtScan String? @map("target_url_at_scan")
+
+  @@index([qrId])
+  @@index([scanTimestamp])
+  @@map("qr_scan_events")
+}
+
+model AuditLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Nullable: changes made via a public API key (see src/lib/auth/requireApiKey.ts)
+  // aren't tied to a specific admin, unlike changes made through the dashboard.
+  adminId String? @map("admin_id") @db.Uuid
+  admin   Admin?  @relation(fields: [adminId], references: [id])
+
+  action       String @db.VarChar(100)
+  resourceType String @map("resource_type") @db.VarChar(50)
+  resourceId   String @map("resource_id") @db.Uuid
+
+  oldValue String? @map("old_value")
+  newValue String? @map("new_value")
+
+  timestamp DateTime @default(now())
+
+  @@index([resourceType, resourceId])
+  @@map("audit_log")
+}
+
+/**
+ * Single-row org-wide config (Account/UTM/domain settings) — not multi-tenant.
+ * Always read/written via the fixed row id "org" (see src/lib/settings/org.ts).
+ */
+model OrgSettings {
+  id String @id @default("org")
+
+  companyName String? @map("company_name") @db.VarChar(255)
+  country     String? @db.VarChar(100)
+  timeZone    String? @map("time_zone") @db.VarChar(100)
+
+  // Default UTM params applied to every QR's redirect target unless that QR has
+  // utmEnabled=false. utm_campaign supports a {{name}} placeholder substituted
+  // with the QR's own name — see src/lib/qr/utm.ts.
+  defaultUtmSource   String? @map("default_utm_source") @db.VarChar(255)
+  defaultUtmMedium   String? @map("default_utm_medium") @db.VarChar(255)
+  defaultUtmCampaign String? @map("default_utm_campaign") @db.VarChar(255)
+  defaultUtmTerm     String? @map("default_utm_term") @db.VarChar(255)
+  defaultUtmContent  String? @map("default_utm_content") @db.VarChar(255)
+
+  // Single-tenant "custom domain": overrides NEXT_PUBLIC_BASE_URL for building
+  // short-link URLs when set, without needing a redeploy.
+  publicBaseUrl String? @map("public_base_url")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("org_settings")
+}
+
+/** Public API keys for /api/v1/* — separate auth path from admin JWT sessions. */
+model ApiKey {
+  id         String    @id @default(uuid()) @db.Uuid
+  label      String    @db.VarChar(255)
+  hashedKey  String    @unique @map("hashed_key")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastUsedAt DateTime? @map("last_used_at")
+
+  @@map("api_keys")
+}
