@@ -48,7 +48,7 @@ describe('AdminLoginPage', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(window.localStorage.getItem('tapnreview_admin_token')).toBe('test-jwt-token');
+      expect(window.localStorage.getItem('dynamicQR_admin_token')).toBe('test-jwt-token');
     });
     expect(replaceMock).toHaveBeenCalledWith('/admin');
   }, 15_000);

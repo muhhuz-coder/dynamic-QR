@@ -1,6 +1,6 @@
 'use client';
 
-const TOKEN_KEY = 'tapnreview_admin_token';
+const TOKEN_KEY = 'dynamicQR_admin_token';
 
 export function getAdminToken(): string | null {
   if (typeof window === 'undefined') return null;

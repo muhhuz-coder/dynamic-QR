@@ -140,6 +140,22 @@ describe('GET /api/admin/qr/[qrName]/image (integration)', () => {
     expect(await response.text()).toContain('stroke="#2563eb"');
   });
 
+  it("renders dot-shaped modules from the QR's stored designOptions", async () => {
+    const suffix = Date.now().toString(36);
+    const qrCode = await db.qrCode.create({
+      data: {
+        qrName: `im-shape-${suffix}`,
+        shortCode: `IMS${suffix}`.toUpperCase(),
+        targetUrl: 'https://example.com',
+        designOptions: { moduleShape: 'dots' },
+      },
+    });
+    createdQrIds.push(qrCode.id);
+
+    const response = await makeRequest(qrCode.qrName, 'svg');
+    expect(await response.text()).toContain('<circle');
+  });
+
   it('400s when a non-URL QR has no payload stored', async () => {
     const suffix = Date.now().toString(36);
     const brokenVcard = await db.qrCode.create({

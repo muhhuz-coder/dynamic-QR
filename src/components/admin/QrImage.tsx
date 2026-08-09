@@ -6,8 +6,14 @@ import { adminFetch } from '@/lib/adminClient';
 
 /**
  * <img> can't send an Authorization header, and the image endpoint is
- * admin-gated like every other /api/admin/* route — so this fetches the PNG
+ * admin-gated like every other /api/admin/* route — so this fetches the image
  * as a blob and renders it via an object URL instead of a bare <img src>.
+ *
+ * Fetches the SVG, not the PNG: shape/frame/text/gradient design options
+ * (src/lib/qr/image.ts) are SVG-only, so a PNG preview would silently omit
+ * them and look wrong right after a "Saved" design change. Browsers render
+ * an SVG blob URL inside <img> the same as a raster image, so this is a
+ * drop-in swap with no other change needed.
  */
 export function QrImage({ qrName, size = 160 }: { qrName: string; size?: number }) {
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
@@ -16,7 +22,7 @@ export function QrImage({ qrName, size = 160 }: { qrName: string; size?: number 
     let currentUrl: string | null = null;
     let cancelled = false;
 
-    adminFetch(`/api/admin/qr/${qrName}/image`)
+    adminFetch(`/api/admin/qr/${qrName}/image?format=svg`)
       .then((response) => response.blob())
       .then((blob) => {
         if (cancelled) return;

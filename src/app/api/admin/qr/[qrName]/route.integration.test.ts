@@ -205,6 +205,34 @@ describe('/api/admin/qr/[qrName] (integration)', () => {
     expect(detail.qrCode.designOptions).toBeNull();
   });
 
+  it('sets shape/frame/text/gradient designOptions via PUT', async () => {
+    const qrCode = await createTestQrCode();
+    const designOptions = {
+      moduleShape: 'dots',
+      eyeShape: 'circle',
+      gradient: { from: '#2563eb', to: '#f97316', direction: 'horizontal' },
+      frame: 'scan-me',
+      frameColor: '#111111',
+      frameText: 'TAP HERE',
+      headerText: 'Order #12345',
+      headerColor: '#222222',
+      footerText: 'Thank you!',
+      footerColor: '#333333',
+    };
+    expect((await makeRequest(qrCode.qrName, { designOptions })).status).toBe(200);
+
+    const detail = await (await makeGetRequest(qrCode.qrName)).json();
+    expect(detail.qrCode.designOptions).toEqual(designOptions);
+  });
+
+  it('400s for an invalid designOptions moduleShape', async () => {
+    const qrCode = await createTestQrCode();
+    const response = await makeRequest(qrCode.qrName, {
+      designOptions: { moduleShape: 'triangle' },
+    });
+    expect(response.status).toBe(400);
+  });
+
   it('400s for an invalid designOptions fgColor', async () => {
     const qrCode = await createTestQrCode();
     const response = await makeRequest(qrCode.qrName, { designOptions: { fgColor: 'not-a-hex' } });

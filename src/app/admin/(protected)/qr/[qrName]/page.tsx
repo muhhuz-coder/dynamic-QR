@@ -32,7 +32,21 @@ interface QrDetail {
   tags: string[];
   expiresAt: string | null;
   utmEnabled: boolean;
-  designOptions: { fgColor?: string; bgColor?: string; logoUrl?: string } | null;
+  designOptions: {
+    fgColor?: string;
+    bgColor?: string;
+    logoUrl?: string;
+    moduleShape?: 'square' | 'rounded' | 'dots' | 'diamond';
+    eyeShape?: 'square' | 'rounded' | 'circle';
+    gradient?: { from: string; to: string; direction?: 'horizontal' | 'vertical' | 'diagonal' };
+    frame?: 'none' | 'square' | 'rounded' | 'scan-me';
+    frameColor?: string;
+    frameText?: string;
+    headerText?: string;
+    headerColor?: string;
+    footerText?: string;
+    footerColor?: string;
+  } | null;
   totalScanCount: number;
   lastScannedAt: string | null;
   auditLogs: AuditLogEntry[];
@@ -76,6 +90,23 @@ export default function QrDetailPage({ params }: { params: Promise<{ qrName: str
   const [fgColor, setFgColor] = useState('#000000');
   const [bgColor, setBgColor] = useState('#ffffff');
   const [logoUrl, setLogoUrl] = useState('');
+  const [useGradient, setUseGradient] = useState(false);
+  const [gradientFrom, setGradientFrom] = useState('#2563eb');
+  const [gradientTo, setGradientTo] = useState('#f97316');
+  const [gradientDirection, setGradientDirection] = useState<
+    'horizontal' | 'vertical' | 'diagonal'
+  >('diagonal');
+  const [moduleShape, setModuleShape] = useState<'square' | 'rounded' | 'dots' | 'diamond'>(
+    'square',
+  );
+  const [eyeShape, setEyeShape] = useState<'square' | 'rounded' | 'circle'>('square');
+  const [frame, setFrame] = useState<'none' | 'square' | 'rounded' | 'scan-me'>('none');
+  const [frameColor, setFrameColor] = useState('#000000');
+  const [frameText, setFrameText] = useState('');
+  const [headerText, setHeaderText] = useState('');
+  const [headerColor, setHeaderColor] = useState('#000000');
+  const [footerText, setFooterText] = useState('');
+  const [footerColor, setFooterColor] = useState('#000000');
   const [designError, setDesignError] = useState<string | null>(null);
   const [designSuccess, setDesignSuccess] = useState<string | null>(null);
   const [savingDesign, setSavingDesign] = useState(false);
@@ -104,9 +135,23 @@ export default function QrDetailPage({ params }: { params: Promise<{ qrName: str
           detailBody.qrCode.expiresAt ? detailBody.qrCode.expiresAt.slice(0, 10) : '',
         );
         setUtmEnabled(detailBody.qrCode.utmEnabled);
-        setFgColor(detailBody.qrCode.designOptions?.fgColor ?? '#000000');
-        setBgColor(detailBody.qrCode.designOptions?.bgColor ?? '#ffffff');
-        setLogoUrl(detailBody.qrCode.designOptions?.logoUrl ?? '');
+        const design = detailBody.qrCode.designOptions;
+        setFgColor(design?.fgColor ?? '#000000');
+        setBgColor(design?.bgColor ?? '#ffffff');
+        setLogoUrl(design?.logoUrl ?? '');
+        setUseGradient(Boolean(design?.gradient));
+        setGradientFrom(design?.gradient?.from ?? '#2563eb');
+        setGradientTo(design?.gradient?.to ?? '#f97316');
+        setGradientDirection(design?.gradient?.direction ?? 'diagonal');
+        setModuleShape(design?.moduleShape ?? 'square');
+        setEyeShape(design?.eyeShape ?? 'square');
+        setFrame(design?.frame ?? 'none');
+        setFrameColor(design?.frameColor ?? '#000000');
+        setFrameText(design?.frameText ?? '');
+        setHeaderText(design?.headerText ?? '');
+        setHeaderColor(design?.headerColor ?? '#000000');
+        setFooterText(design?.footerText ?? '');
+        setFooterColor(design?.footerColor ?? '#000000');
         setAnalytics(analyticsBody.analytics);
       } catch (error) {
         if (error instanceof UnauthorizedError) router.replace('/admin/login');
@@ -203,9 +248,19 @@ export default function QrDetailPage({ params }: { params: Promise<{ qrName: str
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           designOptions: {
-            fgColor,
+            ...(useGradient ? {} : { fgColor }),
             bgColor,
             ...(logoUrl.trim() ? { logoUrl: logoUrl.trim() } : {}),
+            ...(useGradient
+              ? { gradient: { from: gradientFrom, to: gradientTo, direction: gradientDirection } }
+              : {}),
+            moduleShape,
+            eyeShape,
+            frame,
+            ...(frame !== 'none' ? { frameColor } : {}),
+            ...(frame === 'scan-me' && frameText.trim() ? { frameText: frameText.trim() } : {}),
+            ...(headerText.trim() ? { headerText: headerText.trim(), headerColor } : {}),
+            ...(footerText.trim() ? { footerText: footerText.trim(), footerColor } : {}),
           },
         }),
       });
@@ -244,6 +299,19 @@ export default function QrDetailPage({ params }: { params: Promise<{ qrName: str
       setFgColor('#000000');
       setBgColor('#ffffff');
       setLogoUrl('');
+      setUseGradient(false);
+      setGradientFrom('#2563eb');
+      setGradientTo('#f97316');
+      setGradientDirection('diagonal');
+      setModuleShape('square');
+      setEyeShape('square');
+      setFrame('none');
+      setFrameColor('#000000');
+      setFrameText('');
+      setHeaderText('');
+      setHeaderColor('#000000');
+      setFooterText('');
+      setFooterColor('#000000');
       setDesignSuccess('Reset to defaults');
       setDesignKey((k) => k + 1);
       await load(qrName);
@@ -496,19 +564,70 @@ export default function QrDetailPage({ params }: { params: Promise<{ qrName: str
           <Card>
             <h2 className="text-foreground mb-4 text-lg font-medium">Customize design</h2>
             <form onSubmit={handleSaveDesign} className="flex flex-col gap-4" noValidate>
+              <label className="text-foreground flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={useGradient}
+                  onChange={(e) => setUseGradient(e.target.checked)}
+                />
+                Use a gradient instead of a flat color
+              </label>
               <div className="flex flex-wrap gap-6">
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-foreground text-sm font-medium">Foreground color</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={fgColor}
-                      onChange={(e) => setFgColor(e.target.value)}
-                      className="border-border h-9 w-9 cursor-pointer rounded border"
-                    />
-                    <span className="text-muted text-sm">{fgColor}</span>
-                  </div>
-                </label>
+                {useGradient ? (
+                  <>
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-foreground text-sm font-medium">Gradient from</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={gradientFrom}
+                          onChange={(e) => setGradientFrom(e.target.value)}
+                          className="border-border h-9 w-9 cursor-pointer rounded border"
+                        />
+                        <span className="text-muted text-sm">{gradientFrom}</span>
+                      </div>
+                    </label>
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-foreground text-sm font-medium">Gradient to</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={gradientTo}
+                          onChange={(e) => setGradientTo(e.target.value)}
+                          className="border-border h-9 w-9 cursor-pointer rounded border"
+                        />
+                        <span className="text-muted text-sm">{gradientTo}</span>
+                      </div>
+                    </label>
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-foreground text-sm font-medium">Direction</span>
+                      <select
+                        value={gradientDirection}
+                        onChange={(e) =>
+                          setGradientDirection(e.target.value as typeof gradientDirection)
+                        }
+                        className="border-border bg-background text-foreground rounded-md border px-3 py-2 text-sm"
+                      >
+                        <option value="horizontal">Horizontal</option>
+                        <option value="vertical">Vertical</option>
+                        <option value="diagonal">Diagonal</option>
+                      </select>
+                    </label>
+                  </>
+                ) : (
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-foreground text-sm font-medium">Foreground color</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={fgColor}
+                        onChange={(e) => setFgColor(e.target.value)}
+                        className="border-border h-9 w-9 cursor-pointer rounded border"
+                      />
+                      <span className="text-muted text-sm">{fgColor}</span>
+                    </div>
+                  </label>
+                )}
                 <label className="flex flex-col gap-1.5">
                   <span className="text-foreground text-sm font-medium">Background color</span>
                   <div className="flex items-center gap-2">
@@ -522,6 +641,91 @@ export default function QrDetailPage({ params }: { params: Promise<{ qrName: str
                   </div>
                 </label>
               </div>
+
+              <div className="flex flex-wrap gap-6">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-foreground text-sm font-medium">Module shape</span>
+                  <select
+                    value={moduleShape}
+                    onChange={(e) => setModuleShape(e.target.value as typeof moduleShape)}
+                    className="border-border bg-background text-foreground rounded-md border px-3 py-2 text-sm"
+                  >
+                    <option value="square">Square</option>
+                    <option value="rounded">Rounded</option>
+                    <option value="dots">Dots</option>
+                    <option value="diamond">Diamond</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-foreground text-sm font-medium">Eye shape</span>
+                  <select
+                    value={eyeShape}
+                    onChange={(e) => setEyeShape(e.target.value as typeof eyeShape)}
+                    className="border-border bg-background text-foreground rounded-md border px-3 py-2 text-sm"
+                  >
+                    <option value="square">Square</option>
+                    <option value="rounded">Rounded</option>
+                    <option value="circle">Circle</option>
+                  </select>
+                </label>
+              </div>
+
+              <label className="flex flex-col gap-1.5">
+                <span className="text-foreground text-sm font-medium">Frame</span>
+                <select
+                  value={frame}
+                  onChange={(e) => setFrame(e.target.value as typeof frame)}
+                  className="border-border bg-background text-foreground rounded-md border px-3 py-2 text-sm"
+                >
+                  <option value="none">No frame</option>
+                  <option value="square">Square border</option>
+                  <option value="rounded">Rounded border</option>
+                  <option value="scan-me">Border with &quot;SCAN ME&quot; bar</option>
+                </select>
+              </label>
+              {frame !== 'none' && (
+                <div className="flex flex-wrap gap-6">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-foreground text-sm font-medium">Frame color</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={frameColor}
+                        onChange={(e) => setFrameColor(e.target.value)}
+                        className="border-border h-9 w-9 cursor-pointer rounded border"
+                      />
+                      <span className="text-muted text-sm">{frameColor}</span>
+                    </div>
+                  </label>
+                  {frame === 'scan-me' && (
+                    <TextField
+                      label="Caption text"
+                      name="frameText"
+                      placeholder="SCAN ME"
+                      value={frameText}
+                      onChange={(e) => setFrameText(e.target.value)}
+                    />
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-6">
+                <TextField
+                  label="Header text (optional)"
+                  name="headerText"
+                  placeholder="Order #12345"
+                  value={headerText}
+                  onChange={(e) => setHeaderText(e.target.value)}
+                />
+                <TextField
+                  label="Footer text (optional)"
+                  name="footerText"
+                  placeholder="Thank you!"
+                  value={footerText}
+                  onChange={(e) => setFooterText(e.target.value)}
+                />
+              </div>
+
               <TextField
                 label="Logo URL (optional)"
                 name="logoUrl"

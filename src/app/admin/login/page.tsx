@@ -59,8 +59,10 @@ export default function AdminLoginPage() {
   return (
     <main className="bg-background flex min-h-screen items-center justify-center px-4">
       <Card className="w-full max-w-sm">
-        <h1 className="text-foreground mb-1 text-xl font-semibold">Admin sign in</h1>
-        <p className="text-muted mb-6 text-sm">Tap &amp; Review QR management</p>
+        <div className="flex flex-col items-center text-center">
+          <h1 className="text-foreground mb-1 text-xl font-semibold">Dynamic QR</h1>
+          <p className="text-muted mb-6 text-sm">Tap &amp; Review QR management</p>
+        </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
           <TextField

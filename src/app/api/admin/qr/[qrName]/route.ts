@@ -28,6 +28,32 @@ const bodySchema = z
           .regex(/^#[0-9a-fA-F]{6}$/)
           .optional(),
         logoUrl: z.string().url().optional(),
+        moduleShape: z.enum(['square', 'rounded', 'dots', 'diamond']).optional(),
+        eyeShape: z.enum(['square', 'rounded', 'circle']).optional(),
+        gradient: z
+          .object({
+            from: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+            to: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+            direction: z.enum(['horizontal', 'vertical', 'diagonal']).optional(),
+          })
+          .optional(),
+        bgImageUrl: z.string().url().optional(),
+        frame: z.enum(['none', 'square', 'rounded', 'scan-me']).optional(),
+        frameColor: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/)
+          .optional(),
+        frameText: z.string().max(40).optional(),
+        headerText: z.string().max(60).optional(),
+        headerColor: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/)
+          .optional(),
+        footerText: z.string().max(60).optional(),
+        footerColor: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/)
+          .optional(),
       })
       .nullable()
       .optional(),
