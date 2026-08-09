@@ -1,0 +1,44 @@
+@import 'tailwindcss';
+
+/*
+ * Light, white-card, bright-blue-accent theme — copied from QR Codes
+ * Unlimited's actual dashboard, per docs/core-logic/02-qr-management.md
+ * Implementation Notes. Deliberately no dark mode — they don't have one,
+ * and this is meant to look like their app regardless of the visitor's
+ * system color-scheme preference.
+ */
+:root {
+  --background: #f1f5f9;
+  --surface: #ffffff;
+  --foreground: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-foreground: #ffffff;
+  --nav-background: #2563eb;
+  --nav-foreground: #ffffff;
+  --danger: #dc2626;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-nav-background: var(--nav-background);
+  --color-nav-foreground: var(--nav-foreground);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
